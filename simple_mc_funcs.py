@@ -144,7 +144,7 @@ def histogramlogspacing(powerlawdist, measuredpathdist, bin_number=-1, min=10, m
     assert bin_number ==-1 or bin_number>0, "Use valid bin number"
 
     if bin_number==-1:
-        bin_number = int(np.ceil(np.sqrt(len(powerlawdist)))) 
+        bin_number = int(np.floor(np.sqrt(len(powerlawdist))))+1
 
     if max==-1:
         max = np.max(powerlawdist)+1
@@ -156,7 +156,8 @@ def histogramlogspacing(powerlawdist, measuredpathdist, bin_number=-1, min=10, m
     # Initializing arrays to store traversed path and error on the mean
     traversedpathaverageperbin = np.zeros(shape=len(histo[0]))
     traversedpatherrorperbin = np.zeros(shape=len(histo[0]))
-    traversedsinglepathmeasurements = []
+    traversedpathrms = np.zeros(shape=len(histo[0]))
+    #traversedsinglepathmeasurements = []
 
     # Reducing array of bin indices to array without repeats
     reduced_indeces = np.unique(indices)
@@ -170,12 +171,55 @@ def histogramlogspacing(powerlawdist, measuredpathdist, bin_number=-1, min=10, m
         # RMS error per bin
         rmse=np.sqrt(np.sum(((binnedlambdas-binnedaveragelambda)**2))/(len(binnedlambdas)-1))
         normedrmse=rmse/np.sqrt(len(binnedlambdas))
-            
+
+        traversedpathrms[arrindex]=(np.sqrt(np.sum(((binnedlambdas)**2))/(len(binnedlambdas)-1)))/np.sqrt(len(binnedlambdas)) # Divded by sqrt(N)    
         traversedpathaverageperbin[arrindex]=binnedaveragelambda
         traversedpatherrorperbin[arrindex]=normedrmse
-        traversedsinglepathmeasurements.append(binnedlambdas)
+        # traversedsinglepathmeasurements.append(binnedlambdas) This array would contain the single measurements that were sampled (unbinned)
 
-    return histo, traversedpathaverageperbin, traversedpatherrorperbin, traversedsinglepathmeasurements
+    return histo, traversedpathaverageperbin, traversedpatherrorperbin, traversedpathrms
+
+def experimental_cs(lambda_measured, lambda_error,n=1.05e22):
+    """
+    Calculates the cross section using 1/(n*lambda)
+    Make sure units are consistent
+    
+    Parameters
+    ----------
+    lambda_per_bin : ndarray
+        The measured traversed path per energy bin
+    lambda_error : ndarray
+        The error per bin associated with the mean traversed path
+    n : float
+        The number density of the material where gamma rays are going through
+        Some useful values:
+        air n = 0.02504e21 cm^-3
+        tungsten n = 6.31e22 cm^-3
+        CsI n  = 1.05e22 cm^-3
+    
+    Returns
+    ----------
+    cs : ndarray of size len(lambda_measured)
+        The measured cross section using 1/(n*lambda_measured)
+    cs_error : ndarray of shape (2,len(lambda_measured))
+        Assymetric errors (lower,upper) calculated following recipe from
+        Lous Lyons, A practical guide to data analysis for physical science 
+        students, 1991s
+
+    """
+    cs=1/(lambda_measured*n) #cs: cross section
+    cs_error=np.zeros(shape=(2,len(lambda_measured)))
+
+    delta_cs_1=1/(n*(lambda_measured+lambda_error))
+    delta_cs_2=1/(n*(lambda_measured-lambda_error))
+
+    lower_error=np.sqrt(np.square(delta_cs_1-cs))
+    upper_error=np.sqrt(np.square(delta_cs_2-cs))
+    cs_error[0]=lower_error
+    cs_error[1]=upper_error
+
+    return cs, cs_error
+
 
 def filltraversedpathbins(E1,E2,binsizes,meanpathdist,binspacing=1):
     """
