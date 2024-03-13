@@ -113,13 +113,20 @@ def SB_factor(E, n=-1, E_LIV=1.22e16):
     E : float
     energy of primary, should be units of TeV
     
-    E_qg : float 
+    E_LIV : float 
         LIV energy scale, defaults to Planck scale [TeV]
     
     n : integer 
         order of the LIV effect, can be +-integers
     """
     m_e = 511e-9 # TeV
+    if type(E_LIV)!=float:
+        if len(E_LIV)>1:
+            E_LIV=E_LIV[:,np.newaxis]
+            E=np.broadcast_to(E,len(E_LIV),len(E))
+            factor = 1+n*(E**3)/(4*E_LIV*m_e**2)
+            return 1/factor
+    
     factor = 1+n*(E**3)/(4*E_LIV*m_e**2)
     return 1/factor
 
@@ -168,6 +175,8 @@ def histogramlogspacing(powerlawdist, measuredpathdist, bin_number=-1, min=10, m
         binnedlambdas = measuredpathdist[mask]
         # Average lambda per bin
         binnedaveragelambda = np.mean(binnedlambdas)
+        if binnedaveragelambda==0:
+            print('opps')
         # RMS error per bin
         rmse=np.sqrt(np.sum(((binnedlambdas-binnedaveragelambda)**2))/(len(binnedlambdas)-1))
         normedrmse=rmse/np.sqrt(len(binnedlambdas))
